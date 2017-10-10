@@ -253,14 +253,19 @@ def get_init_cell(batch_size, rnn_size):
     
     lstm = tf.contrib.rnn.MultiRNNCell([make_cell(rnn_size) for _ in range(lstm_num_layers)])
     initial_state = tf.identity(lstm.zero_state(batch_size, tf.float32), name = "initial_state")
-    
     return lstm, initial_state
     """
     
     lstm_num_layers = 3
     lstm = tf.contrib.rnn.BasicLSTMCell(rnn_size)
+    """
+    函数实现实际不建议应用dropout，dropout主要是为了防止overfitting，但这个项目很可能出现underfitting。
+    下面2个链接是对LSTM 和 RNN解释的参考：
+    http://karpathy.github.io/2015/05/21/rnn-effectiveness/
+    http://colah.github.io/posts/2015-08-Understanding-LSTMs/
     lstm_drop = tf.contrib.rnn.DropoutWrapper(lstm, output_keep_prob = 0.75)
-    multi_cell = tf.contrib.rnn.MultiRNNCell([lstm_drop] * lstm_num_layers)
+    """
+    multi_cell = tf.contrib.rnn.MultiRNNCell([lstm] * lstm_num_layers)
     initial_state = tf.identity(multi_cell.zero_state(batch_size, tf.float32), name = "initial_state")
     
     return multi_cell, initial_state
@@ -286,9 +291,16 @@ def get_embed(input_data, vocab_size, embed_dim):
     :return: Embedded input.
     """
     # TODO: Implement Function
-    embed_input = tf.Variable(tf.truncated_normal((vocab_size, embed_dim), stddev = 0.01))
-    embed_input = tf.nn.embedding_lookup(embed_input, input_data)
-    #tf.nn.embedding_lookup（tensor, id）テンソル内に対応の元素を選択する
+    
+    # 方法一
+    # embed_input = tf.Variable(tf.truncated_normal((vocab_size, embed_dim), stddev = 0.01))
+    # embed_input = tf.nn.embedding_lookup(embed_input, input_data)
+    # tf.nn.embedding_lookup（tensor, id）テンソル内に対応の元素を選択する
+    
+    # 方法二
+    # Note: 这里也可以直接使用 tensorflow wrapper ：tf.contrib.layers.embed_sequence() 来实现
+    # 参考：https://www.tensorflow.org/api_docs/python/tf/contrib/layers/embed_sequence
+    embed_input = tf.contrib.layers.embed_sequence(input_data, vocab_size, embed_dim)
     
     return embed_input
 
@@ -437,22 +449,36 @@ tests.test_get_batches(get_batches)
 # - Set `learning_rate` to the learning rate.
 # - Set `show_every_n_batches` to the number of batches the neural network should print progress.
 
-# In[14]:
+# In[22]:
 
 
 # Number of Epochs
-num_epochs = 60
+# 具有足够多的 epoch 使得神经网络的训练loss接近或达到最小。epoch不设上限，能使得训练 loss 较小，
+num_epochs = 150
+
 # Batch Size
+# 具有适当的 batch size，要足够大使得神经网络才能够高效地训练，同时也不能过大否则内存会不够。
+# 此处并没有所谓“最好的”值，它往往受GPU 显存的影响
 batch_size = 64
+
 # RNN Size
-rnn_size = 128
+# RNN 层的大小（即隐层中节点的数量）足够大，使之能够很好的拟合数据。
+rnn_size = 256
+
 # Embedding Dimension Size
-embed_dim = 80
+# embed_dim是传入到LSTM cell的input的数量，这个一般跟词汇量匹配，建议调整到200到300左右。
+embed_dim = 200
+
 # Sequence Length
+# 序列长度（seq_length）应大约是希望生成句子的长度。它应当与给出数据的结构相匹配。
 seq_length = 20
+
 # Learning Rate
-learning_rate = 0.03
+# 学习率不能太大，如果太大的话那么训练算法将不会收敛。不过也要是适当的值，确保算法不会无限制地训练。
+learning_rate = 0.01
+
 # Show stats for every n number of batches
+# show_every_n_batches 为训练过程中打印进程频率，每show_every_n_batches打印一次训情况
 show_every_n_batches = 80
 
 
@@ -465,7 +491,7 @@ save_dir = './save'
 # ### Build the Graph
 # Build the graph using the neural network you implemented.
 
-# In[15]:
+# In[23]:
 
 
 """
@@ -502,7 +528,7 @@ with train_graph.as_default():
 # ## Train
 # Train the neural network on the preprocessed data.  If you have a hard time getting a good loss, check the [forms](https://discussions.udacity.com/) to see if anyone is having the same problem.
 
-# In[16]:
+# In[24]:
 
 
 """
@@ -541,7 +567,7 @@ with tf.Session(graph=train_graph) as sess:
 # ## Save Parameters
 # Save `seq_length` and `save_dir` for generating a new TV script.
 
-# In[17]:
+# In[25]:
 
 
 """
@@ -553,7 +579,7 @@ helper.save_params((seq_length, save_dir))
 
 # # Checkpoint
 
-# In[18]:
+# In[26]:
 
 
 """
@@ -578,7 +604,7 @@ seq_length, load_dir = helper.load_params()
 # 
 # Return the tensors in the following tuple `(InputTensor, InitialStateTensor, FinalStateTensor, ProbsTensor)` 
 
-# In[19]:
+# In[27]:
 
 
 def get_tensors(loaded_graph):
@@ -605,7 +631,7 @@ tests.test_get_tensors(get_tensors)
 # ### Choose Word
 # Implement the `pick_word()` function to select the next word using `probabilities`.
 
-# In[20]:
+# In[28]:
 
 
 def pick_word(probabilities, int_to_vocab):
@@ -629,7 +655,7 @@ tests.test_pick_word(pick_word)
 # ## Generate TV Script
 # This will generate the TV script for you.  Set `gen_length` to the length of TV script you want to generate.
 
-# In[21]:
+# In[29]:
 
 
 gen_length = 200
